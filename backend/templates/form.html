@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Candlestick Pattern Search</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 30px; background: #f6f8fa; }
+    form { background: #fff; padding: 20px 36px 20px 20px; border-radius: 8px; box-shadow: 0 1px 9px #dddddd; max-width: 450px; margin: 32px auto; }
+    h2 { text-align: center; margin-bottom: 22px; }
+    label { display: block; margin-bottom: 12px; }
+    select, input[type="text"] { width: 230px; margin-bottom: 8px; }
+    .patterns-box { margin: 10px 0; }
+    .patterns-box label { display: inline-block; width: 120px; }
+    button { background: #006cff; color: #fff; border: none; padding: 10px 26px; font-size: 15px; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #0056c2; }
+  </style>
+</head>
+<body>
+  <form method="get" action="{{ url_for('detect_patterns') }}">
+    <h2>Candlestick Pattern Scanner</h2>
+    <label>
+      Stock:
+      <select name="stock" required>
+        <option value="BAJAJ-AUTO">BAJAJ-AUTO</option>
+        <option value="BHARTIARTL">BHARTIARTL</option>
+        <option value="ICICIBANK">ICICIBANK</option>
+        <option value="RELIANCE">RELIANCE</option>
+        <option value="TCS">TCS</option>
+      </select>
+    </label>
+
+    <label>
+      Start Date (DD-MM-YYYY):
+      <input type="text" name="start_date" value="01-01-2025" required pattern="\d{2}-\d{2}-\d{4}">
+    </label>
+
+    <label>
+      End Date (DD-MM-YYYY):
+      <input type="text" name="end_date" value="05-01-2025" required pattern="\d{2}-\d{2}-\d{4}">
+    </label>
+
+    <label>
+      Timeframe:
+      <select name="timeframe">
+        <option value="1m">1m</option>
+        <option value="5m">5m</option>
+        <option value="15m">15m</option>
+      </select>
+    </label>
+
+    <label>
+  Select Pattern:
+  <select name="pattern" required>
+    <option value="" disabled selected>Select pattern</option>
+    <option value="evening_star">Evening Star</option>
+    <option value="hammer">Hammer</option>
+    <option value="dragonfly_doji">Dragonfly Doji</option>
+    <option value="three_white_soldiers">Three White Soldiers</option>
+    <option value="rising_window">Rising Window</option>
+  </select>
+</label>
+  
+    <button type="submit">Show Patterns & Chart</button>
+  </form>
+</body>
+</html>
