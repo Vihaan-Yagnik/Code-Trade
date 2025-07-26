@@ -1,0 +1,289 @@
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Candlestick Pattern Results</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background-color: #fafafa;
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        max-width: 100%;
+        margin: auto;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        background-color: #fff;
+      }
+      thead tr {
+        background-color: #007BFF;
+        color: white;
+      }
+      th, td {
+        border: 1px solid #ddd;
+        padding: 8px 12px;
+        text-align: center;
+        font-size: 14px;
+      }
+      tbody tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+      tbody tr.highlight {
+        background-color: #ffeded !important;
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      tbody tr.highlight:hover {
+        background-color: #ffdada !important;
+      }
+      tbody td {
+        vertical-align: middle;
+      }
+      tbody td {
+        color: #444;
+      }
+      tbody td.true-cell {
+        background-color: #d4edda;
+        color: #155724;
+        font-weight: bold;
+      }
+      @media (max-width: 768px) {
+        table, thead, tbody, th, td, tr {
+          display: block;
+        }
+        thead tr {
+          display: none;
+        }
+        tbody tr {
+          margin-bottom: 15px;
+          border: 1px solid #ccc;
+          padding: 10px;
+          background-color: #fff;
+        }
+        tbody td {
+          border: none;
+          padding-left: 50%;
+          position: relative;
+          text-align: left;
+        }
+        tbody td::before {
+          position: absolute;
+          top: 8px;
+          left: 10px;
+          width: 45%;
+          white-space: nowrap;
+          font-weight: bold;
+          content: attr(data-label);
+        }
+      }
+      #pattern-chart {
+        max-width: 1200px;
+        height: 450px;
+        margin: 0 auto 30px auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Candlestick Pattern Results for {{ stock }}</h1>
+    <p style="text-align: center; margin-bottom: 20px;">
+      Period: {{ start_date }} to {{ end_date }}<br />
+      Timeframe: {{ timeframe }}<br />
+      {% if requested_patterns %}
+        Patterns: {{ requested_patterns | join(', ') | replace('_', ' ') | title }}
+      {% endif %}
+    </p>
+
+    <!-- Plotly Chart Container -->
+    <div id="pattern-chart"></div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Datetime</th>
+          <th>Open</th>
+          <th>High</th>
+          <th>Low</th>
+          <th>Close</th>
+          <th>Volume</th>
+          {% for pattern_col in requested_patterns %}
+            <th>{{ pattern_col.replace('_', ' ').title() }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in tables %}
+          {% set highlight = false %}
+          {% for p in requested_patterns %}
+            {% if row.get(p) %}
+              {% set highlight = true %}
+            {% endif %}
+          {% endfor %}
+          {% set any_pattern = row.hammer or row.dragonfly_doji or row.evening_star or row.three_white_soldiers or row.rising_window %}
+          {% if any_pattern %}
+          <tr class="{{ 'highlight' if highlight else '' }}"
+              data-datetime="{{ row.openDateTime_str }}">
+            <td data-label="Datetime">{{ row.openDateTime_str }}</td>
+            <td data-label="Open">{{ "%.2f"|format(row.open) }}</td>
+            <td data-label="High">{{ "%.2f"|format(row.high) }}</td>
+            <td data-label="Low">{{ "%.2f"|format(row.low) }}</td>
+            <td data-label="Close">{{ "%.2f"|format(row.close) }}</td>
+            <td data-label="Volume">{{ row.volume }}</td>
+            {% for pattern_col in requested_patterns %}
+              {% set val = row.get(pattern_col, False) %}
+              <td data-label="{{ pattern_col.replace('_', ' ').title() }}" class="{{'true-cell' if val else ''}}">
+                {{ val }}
+              </td>
+            {% endfor %}
+          </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Plotly JS -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script>
+    (function() {
+      const data = {{ tables | tojson }};
+      const patterns = {{ requested_patterns | tojson }};
+
+      // Main multi-candle candlestick chart -- unchanged
+      let chartData = [{
+        x: data.map(d => d.openDateTime_str),
+        open: data.map(d => d.open),
+        high: data.map(d => d.high),
+        low: data.map(d => d.low),
+        close: data.map(d => d.close),
+        type: 'candlestick',
+        name: 'Candles',
+        increasing: {line: {color: '#23a335'}},
+        decreasing: {line: {color: '#c7354e'}},
+        showlegend: false,
+        customdata: data.map(r => r.volume),
+        hovertemplate: 'Datetime: %{x}<br>' +
+                      'Open: %{open}<br>' +
+                      'High: %{high}<br>' +
+                      'Low: %{low}<br>' +
+                      'Close: %{close}<br>' +
+                      'Volume: %{customdata}<extra></extra>'
+      }];
+      const patternColors = {
+        evening_star: 'red', hammer: 'green',
+        dragonfly_doji: 'purple', three_white_soldiers: 'orange',
+        rising_window: 'blue'
+      };
+      const patternSymbols = {
+        evening_star: 'star', hammer: 'triangle-down',
+        dragonfly_doji: 'circle', three_white_soldiers: 'diamond',
+        rising_window: 'triangle-up'
+      };
+
+      patterns.forEach(pattern => {
+        let xVals = [], yVals = [];
+        for (let i = 0; i < data.length; i++) {
+          if (data[i][pattern]) {
+            xVals.push(data[i].openDateTime_str);
+            if (pattern === 'hammer' || pattern === 'dragonfly_doji')
+              yVals.push(data[i].low * 0.995);
+            else if (pattern === 'rising_window')
+              yVals.push(data[i].low * 0.99);
+            else if (pattern === 'three_white_soldiers')
+              yVals.push(data[i].close * 1.01);
+            else
+              yVals.push(data[i].high * 1.01);
+          }
+        }
+        if(xVals.length > 0) {
+          chartData.push({
+            x: xVals,
+            y: yVals,
+            mode: 'markers',
+            marker: {
+              size: 15,
+              color: patternColors[pattern] || 'grey',
+              symbol: patternSymbols[pattern] || 'star',
+              line: {width: 1, color: '#333'}
+            },
+            name: pattern.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          });
+        }
+      });
+
+      Plotly.newPlot('pattern-chart', chartData, {
+        margin: { t: 20, b: 40, l: 40, r: 20 },
+        xaxis: { title: '', rangeslider: { visible: false }, type: 'category', showticklabels: false },
+        yaxis: { title: 'Price' },
+        legend: { orientation: 'h', y: -0.2 },
+        hovermode: 'x unified'
+      });
+
+      // ---- Focused Candle Chart + Summary on Row Click ---
+
+      const singleChartDiv = document.getElementById('single-candle-chart');
+      const summaryDiv = document.getElementById('candle-summary');
+      singleChartDiv.innerHTML = "<p style='color:#a7a7a7;text-align:center;padding-top:45px;'>Click a pattern row to see details &rarr;</p>";
+
+      function showFocusedCandleChart(records, mainRecord) {
+        let trace = {
+          x: records.map(r => r.openDateTime_str),
+          open: records.map(r => r.open),
+          high: records.map(r => r.high),
+          low: records.map(r => r.low),
+          close: records.map(r => r.close),
+          type: 'candlestick',
+          name: 'Focused',
+          increasing: {line: {color: '#23a335', width: 3}},
+          decreasing: {line: {color: '#c7354e', width: 3}},
+          showlegend: false,
+          customdata: records.map(r => r.volume),
+          hovertemplate:
+            'Datetime: %{x}<br>Open: %{open}<br>High: %{high}<br>Low: %{low}<br>Close: %{close}<br>Volume: %{customdata}<extra></extra>'
+        };
+
+        Plotly.newPlot(singleChartDiv, [trace], {
+          margin: { t: 20, b: 30, l: 40, r: 10 },
+          xaxis: { showticklabels: false, fixedrange: true },
+          yaxis: { title: '', fixedrange: true },
+          height: 250,
+          width: 400
+        }, {displayModeBar: false});
+
+        // Show summary of the main record
+        summaryDiv.innerHTML =
+          `<div style="text-align:center; font-weight:600; font-size:16px; margin-bottom:8px;">${mainRecord.openDateTime_str}</div>` +
+          `<table style="width:100%; font-size:14px; margin:0 auto;">` +
+          `<tr><td style="width:60px; text-align:left;">Open:</td><td>${mainRecord.open.toFixed(2)}</td></tr>` +
+          `<tr><td style="width:60px; text-align:left;">High:</td><td>${mainRecord.high.toFixed(2)}</td></tr>` +
+          `<tr><td style="width:60px; text-align:left;">Low:</td><td>${mainRecord.low.toFixed(2)}</td></tr>` +
+          `<tr><td style="width:60px; text-align:left;">Close:</td><td>${mainRecord.close.toFixed(2)}</td></tr>` +
+          `<tr><td style="width:60px; text-align:left;">Volume:</td><td>${mainRecord.volume}</td></tr>` +
+          `</table>`;
+      }
+
+      document.querySelectorAll('tbody tr.highlight').forEach(row => {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function() {
+          const dt = this.getAttribute('data-datetime');
+          const index = data.findIndex(d => d.openDateTime_str === dt);
+          if (index === -1) return;
+
+          // Get prior 20 candles + current candle
+          const start = Math.max(index - 20, 0);
+          const focusedRecords = data.slice(start, index + 1);
+          const mainRecord = data[index];
+
+          showFocusedCandleChart(focusedRecords, mainRecord);
+        });
+      });
+
+    })();
+  </script>
+
+  </body>
+  </html>
